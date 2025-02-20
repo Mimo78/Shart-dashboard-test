@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactieve Ledenlijst</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background: #f3f3f3;
+      font-weight: bold;
+    }
+    th.rotate {
+      height: 100px;
+      white-space: nowrap;
+    }
+    th.rotate div {
+      transform: rotate(-90deg);
+      width: 20px;
+    }
+    /* Vaste breedte voor de linkse nummerkolom (eerste kolom): 50px */
+    th:nth-child(1), td:nth-child(1) {
+      width: 50px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: left;
+    }
+    /* Vaste breedte voor de Nederlandse naam (tweede kolom): 200px */
+    th:nth-child(2), td:nth-child(2) {
+      width: 200px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: left;
+    }
+    /* Vaste breedte voor de Arabische naam (voorlaatste kolom): 200px */
+    th:nth-last-child(2), td:nth-last-child(2) {
+      width: 200px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: right;
+      direction: rtl;
+    }
+    /* Vaste breedte voor de rechter nummerkolom (laatste kolom): 50px */
+    th:last-child, td:last-child {
+      width: 50px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: right;
+    }
+    /* Maandkolommen (kolom 3 t/m 14) blijven dynamisch */
+    th:nth-child(n+3):nth-child(-n+14),
+    td:nth-child(n+3):nth-child(-n+14) {
+      width: auto;
+    }
+    .bank {
+      background-color: lightblue;
+    }
+    .cash {
+      background-color: lightgreen;
+    }
+    input, button {
+      margin: 10px;
+      padding: 8px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Interactieve Ledenlijst</h2>
+  <input type="text" id="zoekveld" placeholder="Zoek op naam..." onkeyup="filterLeden()">
+  <button onclick="resetBetalingen()">Reset betalingen</button>
+  <table id="ledenTable">
+    <thead>
+      <tr>
+        <th>Nr.</th>
+        <th>Naam</th>
+        <th class="rotate"><div>Jan</div></th>
+        <th class="rotate"><div>Feb</div></th>
+        <th class="rotate"><div>Mrt</div></th>
+        <th class="rotate"><div>Apr</div></th>
+        <th class="rotate"><div>Mei</div></th>
+        <th class="rotate"><div>Jun</div></th>
+        <th class="rotate"><div>Jul</div></th>
+        <th class="rotate"><div>Aug</div></th>
+        <th class="rotate"><div>Sep</div></th>
+        <th class="rotate"><div>Okt</div></th>
+        <th class="rotate"><div>Nov</div></th>
+        <th class="rotate"><div>Dec</div></th>
+        <th>الاسم</th>
+        <th>Nr.</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Leden worden hier dynamisch geladen -->
+    </tbody>
+  </table>
+  <script>
+    let leden = [];
+
+    // Hulpfunctie: Zet Europese cijfers om naar Arabische-Indic cijfers.
+    function toArabicNumerals(num) {
+      const mapping = {
+        '0': '٠',
+        '1': '١',
+        '2': '٢',
+        '3': '٣',
+        '4': '٤',
+        '5': '٥',
+        '6': '٦',
+        '7': '٧',
+        '8': '٨',
+        '9': '٩'
+      };
+      return String(num).split('').map(digit => mapping[digit] || digit).join('');
+    }
+
+    function laadLeden() {
+      fetch("leden.json")
+        .then(response => response.json())
+        .then(data => {
+          leden = data;
+          bouwTabel();
+        })
+        .catch(error => console.error("Fout bij laden leden:", error));
+    }
+
+    function bouwTabel() {
+      const tableBody = document.querySelector("#ledenTable tbody");
+      tableBody.innerHTML = "";
+      leden.forEach((lid, index) => {
+        let row = document.createElement("tr");
+        row.setAttribute("data-naam", lid.naam.toLowerCase());
+        row.innerHTML = `
+          <td>${index + 1}</td>
+          <td>${lid.naam}</td>
+          ${Array(12).fill("").map((_, maand) => {
+            let status = localStorage.getItem(`${lid.naam}-${maand}`) || "";
+            let className = status === "bank" ? "bank" : status === "cash" ? "cash" : "";
+            return `<td class="${className}" onclick="togglePayment(this, '${lid.naam}', ${maand})"></td>`;
+          }).join("")}
+          <td>${lid.arabisch}</td>
+          <td>${toArabicNumerals(index + 1)}</td>
+        `;
+        tableBody.appendChild(row);
+      });
+    }
+
+    function togglePayment(cell, naam, maand) {
+      let status = localStorage.getItem(`${naam}-${maand}`);
+      if (!status) {
+        localStorage.setItem(`${naam}-${maand}`, "bank");
+        cell.classList.add("bank");
+      } else if (status === "bank") {
+        localStorage.setItem(`${naam}-${maand}`, "cash");
+        cell.classList.remove("bank");
+        cell.classList.add("cash");
+      } else {
+        localStorage.removeItem(`${naam}-${maand}`);
+        cell.classList.remove("cash");
+      }
+    }
+
+    function filterLeden() {
+      let zoekterm = document.getElementById("zoekveld").value.toLowerCase();
+      document.querySelectorAll("#ledenTable tbody tr").forEach(row => {
+        let naam = row.getAttribute("data-naam");
+        row.style.display = naam.includes(zoekterm) ? "" : "none";
+      });
+    }
+
+    function resetBetalingen() {
+      if (confirm("Weet je zeker dat je alle betalingen wilt resetten?")) {
+        localStorage.clear();
+        bouwTabel();
+      }
+    }
+
+    window.onload = laadLeden;
+  </script>
+</body>
+</html>
